@@ -24,6 +24,9 @@
 
 <div class="card">
   <h2>和弦时间线</h2>
+  <div id="noChordHint" class="small muted" style="display:none;margin:0 0 8px;padding:8px 12px;border:1px dashed var(--border);border-radius:8px;background:rgba(120,128,136,.08)">
+    未检测到和弦内容（静音或噪声），全段标记为「无和弦」。
+  </div>
   <div id="timeline" class="row" style="height:56px;align-items:stretch;border:1px solid var(--border);border-radius:8px;overflow:hidden"></div>
   <div class="small muted mt">点击下方表格中的标签可人工修正，然后保存标注。</div>
 </div>
@@ -91,24 +94,28 @@ function drawChroma() {
 
 function renderSegments() {
   const segs = chordData.segments;
-  const total = chordData.times[chordData.times.length - 1] || 1;
+  const hasChord = segs.some(s => s.label !== "N.C.");
+  $("#noChordHint").style.display = hasChord ? "none" : "block";
   $("#timeline").innerHTML = segs.map(s => {
     const dur = Math.max(s.end - s.start, 0.001);
-    const hue = hueForRoot(s.label);
-    const txt = s.label === "N.C." ? "–" : s.label;
-    return `<div title="${s.label}" style="flex:${dur};background:hsl(${hue},55%,45%);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;border-right:1px solid rgba(0,0,0,.3)">${txt}</div>`;
+    const isNC = s.label === "N.C.";
+    const hue = isNC ? null : hueForRoot(s.label);
+    const bg = isNC ? "rgba(120,128,136,0.28)" : `hsl(${hue},55%,45%)`;
+    const txt = isNC ? "无和弦" : s.label;
+    return `<div title="${isNC ? "无和弦（N.C.）" : s.label}" style="flex:${dur};background:${bg};color:${isNC ? "#8a939e" : "#fff"};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;border-right:1px solid rgba(0,0,0,.3)">${txt}</div>`;
   }).join("");
 
-  const opts = CHORD_LABELS.map(l => `<option ${l === "" ? "" : ""} value="${l}">${l === "" ? "N.C." : l}</option>`).join("");
+  const opts = [`<option value="N.C.">无和弦（N.C.）</option>`]
+    .concat(CHORD_LABELS.map(l => `<option value="${l}">${l}</option>`)).join("");
   $("#segTable").innerHTML = segs.map((s, i) => {
-    const conf = (chordData.confidence && chordData.confidence[i]) || 0;
+    const confText = s.label === "N.C." ? "—" : (s.confidence || 0).toFixed(2);
     return `<tr>
       <td class="mono">${fmtTime(s.start)}</td>
       <td class="mono">${fmtTime(s.end)}</td>
-      <td><select class="annot" data-i="${i}" style="min-width:90px">
+      <td><select class="annot" data-i="${i}" style="min-width:110px">
         ${opts.replace(`value="${esc(s.label)}"`, `value="${esc(s.label)}" selected`)}
       </select></td>
-      <td class="mono">${conf.toFixed(2)}</td>
+      <td class="mono">${confText}</td>
     </tr>`;
   }).join("");
 }

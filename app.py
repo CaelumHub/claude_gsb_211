@@ -419,7 +419,11 @@ def api_analyze(file_id: str, kind: str):
     if not refresh:
         cached = store.get_analysis(file_id, kind)
         if cached:
-            return jsonify(cached)
+            data = cached.get("data") or {}
+            # Stale chord results predate the silence/noise ("N.C.") gates —
+            # recompute instead of serving a forced label from an old cache.
+            if kind != "chords" or data.get("version") == chords.CHORD_VERSION:
+                return jsonify(cached)
     try:
         data = _run_analysis(kind, _abs_path(entry))
     except ValueError as e:
